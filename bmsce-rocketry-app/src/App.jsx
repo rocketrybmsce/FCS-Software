@@ -57,6 +57,23 @@ function App() {
     groundReached: false
   });
 
+  // Launchpad coordinates set by user clicking "Ready to Launch"
+  const [launchpadCoords, setLaunchpadCoords] = useState(null);
+
+  // Calculate distance from launchpad if set
+  const launchpadDistance = launchpadCoords
+    ? calculateDistance(launchpadCoords.lat, launchpadCoords.lon, telemetryData.lat, telemetryData.lon)
+    : 0;
+
+  const handleReadyToLaunch = () => {
+    if (telemetryData.lat && telemetryData.lon) {
+      setLaunchpadCoords({
+        lat: telemetryData.lat,
+        lon: telemetryData.lon
+      });
+    }
+  };
+
   // Monitor telemetry to update flight checkpoints
   useEffect(() => {
     setFlightState(fs => {
@@ -320,6 +337,9 @@ function App() {
       telemetryHistory={telemetryHistory} 
       fullHistory={fullHistory} 
       flightState={flightState} 
+      launchpadDistance={launchpadDistance}
+      launchpadCoords={launchpadCoords}
+      onReadyToLaunch={handleReadyToLaunch}
     />;
   }
 

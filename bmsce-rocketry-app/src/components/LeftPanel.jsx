@@ -1,7 +1,7 @@
 import React from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
-const LeftPanel = ({ telemetryData, telemetryHistory, fullHistory, flightState }) => {
+const LeftPanel = ({ telemetryData, telemetryHistory, fullHistory, flightState, launchpadDistance, launchpadCoords, onReadyToLaunch }) => {
   return (
     <div style={{
       flex: 1,
@@ -115,28 +115,117 @@ const LeftPanel = ({ telemetryData, telemetryHistory, fullHistory, flightState }
 
       </div>
 
-      {/* BOTTOM ROW: Text Data */}
-      <div style={{ flex: 0.8, display: 'flex', flexDirection: 'column', minHeight: 0, backgroundColor: 'rgba(0, 0, 0, 0.2)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', padding: '15px', color: '#fff' }}>
-        <h3 style={{ margin: '0 0 10px 0', fontSize: '1rem', borderBottom: '1px solid #444', paddingBottom: '5px' }}>Data</h3>
+      {/* BOTTOM ROW: Text Data & Controls */}
+      <div style={{ 
+        flex: 0.8, 
+        display: 'flex', 
+        flexDirection: 'column', 
+        minHeight: 0, 
+        backgroundColor: 'rgba(0, 0, 0, 0.2)', 
+        border: '1px solid rgba(255,255,255,0.1)', 
+        borderRadius: '8px', 
+        padding: '12px 15px', 
+        color: '#fff' 
+      }}>
+        {/* HEADER BAR containing title, status, and button */}
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center', 
+          borderBottom: '1px solid rgba(255,255,255,0.1)', 
+          paddingBottom: '6px', 
+          marginBottom: '10px' 
+        }}>
+          <h3 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 'normal', color: '#ccc' }}>Data & Controls</h3>
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+            {/* Launchpad coordinates status */}
+            <div style={{ 
+              fontSize: '0.75rem', 
+              color: launchpadCoords ? '#10b981' : '#888', 
+              fontWeight: launchpadCoords ? 'bold' : 'normal',
+            }}>
+              {launchpadCoords ? (
+                <span>✓ LP Set: {launchpadCoords.lat.toFixed(4)}, {launchpadCoords.lon.toFixed(4)}</span>
+              ) : (
+                <span>Launchpad Not Set</span>
+              )}
+            </div>
+            
+            {/* Ready to Launch button */}
+            <button 
+              onClick={onReadyToLaunch} 
+              style={{
+                backgroundColor: '#2b6cb0', 
+                color: 'white', 
+                border: '1px solid rgba(255,255,255,0.2)', 
+                borderRadius: '4px', 
+                padding: '5px 12px', 
+                cursor: 'pointer', 
+                fontWeight: 'bold',
+                fontSize: '0.75rem',
+                letterSpacing: '0.5px',
+                transition: 'all 0.2s ease',
+                textTransform: 'uppercase',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = '#3182ce';
+                e.target.style.transform = 'translateY(-1px)';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = '#2b6cb0';
+                e.target.style.transform = 'none';
+              }}
+            >
+              Ready to Launch
+            </button>
+          </div>
+        </div>
         
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', fontSize: '1.2rem', flex: 1, alignItems: 'center' }}>
+        {/* Metrics Grid */}
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(3, 1fr)', 
+          gap: '8px 15px', 
+          fontSize: '1rem', 
+          flex: 1, 
+          alignContent: 'center' 
+        }}>
           <div>
-            <span style={{ color: '#aaa', display: 'inline-block', width: '90px' }}>Voltage:</span> {telemetryData.vbat ? telemetryData.vbat.toFixed(2) : '0.00'} V
+            <span style={{ color: '#aaa', marginRight: '6px' }}>Voltage:</span> 
+            <span style={{ fontWeight: 'bold' }}>{telemetryData.vbat ? telemetryData.vbat.toFixed(2) : '0.00'} V</span>
           </div>
           <div>
-            <span style={{ color: '#aaa', display: 'inline-block', width: '90px' }}>Pressure:</span> {telemetryData.pressure ? telemetryData.pressure.toFixed(1) : '0'} Pa
+            <span style={{ color: '#aaa', marginRight: '6px' }}>Pressure:</span> 
+            <span style={{ fontWeight: 'bold' }}>{telemetryData.pressure ? telemetryData.pressure.toFixed(1) : '0'} Pa</span>
           </div>
           <div>
-            <span style={{ color: '#aaa', display: 'inline-block', width: '90px' }}>Current:</span> {telemetryData.currentData ? telemetryData.currentData.toFixed(2) : '0.00'} A
+            <span style={{ color: '#aaa', marginRight: '6px' }}>GS Distance:</span> 
+            <span style={{ fontWeight: 'bold' }}>{telemetryData.distance ? telemetryData.distance.toFixed(1) : '0.0'} m</span>
           </div>
           <div>
-            <span style={{ color: '#aaa', display: 'inline-block', width: '90px' }}>Height:</span> {telemetryData.alt ? telemetryData.alt.toFixed(1) : '0.0'} m
+            <span style={{ color: '#aaa', marginRight: '6px' }}>Current:</span> 
+            <span style={{ fontWeight: 'bold' }}>{telemetryData.currentData ? telemetryData.currentData.toFixed(2) : '0.00'} A</span>
           </div>
           <div>
-            <span style={{ color: '#aaa', display: 'inline-block', width: '30px' }}>T1:</span> {telemetryData.t1 ? telemetryData.t1.toFixed(1) : '0'}°C &nbsp;&nbsp;|&nbsp;&nbsp; <span style={{ color: '#aaa' }}>T2:</span> {telemetryData.t2 ? telemetryData.t2.toFixed(1) : '0'}°C
+            <span style={{ color: '#aaa', marginRight: '6px' }}>Height:</span> 
+            <span style={{ fontWeight: 'bold' }}>{telemetryData.alt ? telemetryData.alt.toFixed(1) : '0.0'} m</span>
           </div>
           <div>
-            <span style={{ color: '#aaa', display: 'inline-block', width: '90px' }}>Distance:</span> {telemetryData.distance ? telemetryData.distance.toFixed(1) : '0.0'} m
+            <span style={{ color: '#aaa', marginRight: '6px' }}>LP Distance:</span> 
+            <span style={{ fontWeight: 'bold' }}>{launchpadDistance !== undefined ? launchpadDistance.toFixed(1) : '0.0'} m</span>
+          </div>
+          <div style={{ gridColumn: 'span 3', display: 'flex', gap: '20px', marginTop: '2px', borderTop: '1px dashed rgba(255,255,255,0.05)', paddingTop: '4px' }}>
+            <div>
+              <span style={{ color: '#aaa', marginRight: '6px' }}>T1:</span>
+              <span style={{ fontWeight: 'bold' }}>{telemetryData.t1 ? telemetryData.t1.toFixed(1) : '0'}°C</span>
+            </div>
+            <div style={{ color: 'rgba(255,255,255,0.2)' }}>|</div>
+            <div>
+              <span style={{ color: '#aaa', marginRight: '6px' }}>T2:</span>
+              <span style={{ fontWeight: 'bold' }}>{telemetryData.t2 ? telemetryData.t2.toFixed(1) : '0'}°C</span>
+            </div>
           </div>
         </div>
       </div>

@@ -30,6 +30,58 @@ function RecenterMap({ lat, lon }) {
   return null;
 }
 
+function KeepRocketCentered({ lat, lon }) {
+  const map = useMap();
+
+  useEffect(() => {
+    const centerOnRocket = () => {
+      map.setView([lat, lon], map.getZoom(), { animate: false });
+    };
+
+    map.on('zoomend', centerOnRocket);
+    return () => map.off('zoomend', centerOnRocket);
+  }, [lat, lon, map]);
+
+  return null;
+}
+
+function LocateRocket({ lat, lon }) {
+  const map = useMap();
+
+  const locateRocket = () => {
+    map.setView([lat, lon], map.getZoom(), { animate: true });
+  };
+
+  return (
+    <button
+      type="button"
+      className="map-locate-button"
+      onClick={locateRocket}
+      aria-label="Center map on rocket"
+      title="Center map on rocket"
+    >
+      <span className="map-locate-icon" aria-hidden="true" />
+    </button>
+  );
+}
+
+function MapResizeHandler() {
+  const map = useMap();
+
+  useEffect(() => {
+    const container = map.getContainer();
+    const refreshMapSize = () => map.invalidateSize({ pan: false });
+
+    refreshMapSize();
+    const resizeObserver = new ResizeObserver(refreshMapSize);
+    resizeObserver.observe(container);
+
+    return () => resizeObserver.disconnect();
+  }, [map]);
+
+  return null;
+}
+
 const MapViewer = ({ lat, lon }) => {
   // Add a fallback just in case data is zero at startup 
   // (using BMSCE approximate coordinates as default)
@@ -59,6 +111,9 @@ const MapViewer = ({ lat, lon }) => {
           <Popup>Rocket Current Pos</Popup>
         </Marker>
         <RecenterMap lat={safeLat} lon={safeLon} />
+        <KeepRocketCentered lat={safeLat} lon={safeLon} />
+        <LocateRocket lat={safeLat} lon={safeLon} />
+        <MapResizeHandler />
       </MapContainer>
     </div>
   );

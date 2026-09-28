@@ -1,8 +1,30 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import './App.css';
 import rocketImg from './assets/rocket.png';
 import logoImg from './assets/logo.png';
 import Dashboard from './components/Dashboard';
+
+const SENSOR_CHECKS = ['barometer', 'IMU', 'GPS'];
+const FLIGHT_STATES = {
+  1: 'motorIgnited',
+  2: 'motorBurnout',
+  3: 'apogeeReached',
+  4: 'recoveryTriggered',
+  5: 'groundReached'
+};
+
+const isValidRocketTelemetryPacket = (line) => {
+  if (!line.startsWith('$RTG,state,')) return false;
+
+  const fields = line.split(',');
+  const packetType = fields[2];
+  const expectedFieldCount = packetType === '1' ? 14 : packetType === '2' ? 10 : 0;
+
+  if (expectedFieldCount === 0 || fields.length !== expectedFieldCount) return false;
+  if (fields[1] !== 'state') return false;
+
+  return fields.slice(3).every((field) => Number.isFinite(Number(field)));
+};
 
 // Utility to calculate 2D distance between ground station and current lat/lon using Haversine
 const calculateDistance = (lat1, lon1, lat2, lon2) => {
@@ -28,6 +50,8 @@ const calculateDistance = (lat1, lon1, lat2, lon2) => {
 function App() {
   const [isConnected, setIsConnected] = useState(false);
   const [baudRate, setBaudRate] = useState("115200");
+  const serialPortRef = useRef(null);
+  const remoteFlightStateRef = useRef(false);
   
   // State to hold current telemetry values
   const [telemetryData, setTelemetryData] = useState({
@@ -56,26 +80,47 @@ function App() {
     recoveryTriggered: false,
     groundReached: false
   });
+  const [sensorChecks, setSensorChecks] = useState({
+    barometer: false,
+    IMU: false,
+    GPS: false
+  });
+  const [isAvionicsCheckRunning, setIsAvionicsCheckRunning] = useState(false);
+  const [isLaunchReady, setIsLaunchReady] = useState(false);
 
   // Launchpad coordinates set by user clicking "Ready to Launch"
   const [launchpadCoords, setLaunchpadCoords] = useState(null);
 
   // Calculate distance from launchpad if set
-  const launchpadDistance = launchpadCoords
-    ? calculateDistance(launchpadCoords.lat, launchpadCoords.lon, telemetryData.lat, telemetryData.lon)
+  const currentLat = Number(telemetryData.lat);
+  const currentLon = Number(telemetryData.lon);
+  const hasCurrentPosition = Number.isFinite(currentLat) && Number.isFinite(currentLon);
+  const launchpadDistance = launchpadCoords && hasCurrentPosition
+    ? calculateDistance(launchpadCoords.lat, launchpadCoords.lon, currentLat, currentLon)
     : 0;
 
   const handleReadyToLaunch = () => {
-    if (telemetryData.lat && telemetryData.lon) {
+    if (!SENSOR_CHECKS.every((sensor) => sensorChecks[sensor])) {
+      alert('Complete the avionics check before marking the rocket ready to launch.');
+      return;
+    }
+
+    const lat = Number(telemetryData.lat);
+    const lon = Number(telemetryData.lon);
+    if (Number.isFinite(lat) && Number.isFinite(lon)) {
       setLaunchpadCoords({
-        lat: telemetryData.lat,
-        lon: telemetryData.lon
+        lat,
+        lon
       });
     }
+    setIsLaunchReady(true);
+    void sendSerialPacket('$GTR,Ready');
   };
 
   // Monitor telemetry to update flight checkpoints
   useEffect(() => {
+    if (remoteFlightStateRef.current) return;
+
     setFlightState(fs => {
       const newState = { ...fs };
       const { a, vz, v } = telemetryData;
@@ -106,6 +151,43 @@ function App() {
       return fs;
     });
   }, [telemetryData]);
+
+  const sendSerialPacket = async (packet) => {
+    const port = serialPortRef.current;
+    if (!port?.writable) return false;
+
+    try {
+      const writer = port.writable.getWriter();
+      await writer.write(new TextEncoder().encode(`${packet}\n`));
+      writer.releaseLock();
+      return true;
+    } catch (error) {
+      console.error('Error sending serial packet:', error);
+      alert('The packet could not be sent over the serial port.');
+      return false;
+    }
+  };
+
+  const simulateAvionicsCheck = () => {
+    SENSOR_CHECKS.forEach((sensor, index) => {
+      setTimeout(() => {
+        setSensorChecks((checks) => ({ ...checks, [sensor]: true }));
+        setIsAvionicsCheckRunning(index < SENSOR_CHECKS.length - 1);
+      }, (index + 1) * 500);
+    });
+  };
+
+  const handleCheckAvionics = async () => {
+    if (isLaunchReady || isAvionicsCheckRunning) return;
+
+    setSensorChecks({ barometer: false, IMU: false, GPS: false });
+    setIsAvionicsCheckRunning(true);
+    const sent = await sendSerialPacket('$GTR,Check');
+
+    if (!sent) {
+      simulateAvionicsCheck();
+    }
+  };
 
   // Generate some dummy data for visualization purposes
   useEffect(() => {
@@ -194,6 +276,7 @@ function App() {
 
       const port = await navigator.serial.requestPort();
       await port.open({ baudRate: parseInt(baudRate) });
+      serialPortRef.current = port;
       setIsConnected(true);
       alert(`Successfully connected to the serial port at ${baudRate} bps!`);
       
@@ -228,25 +311,91 @@ function App() {
           const line = lines[i].trim();
           if (!line) continue;
 
-          // Push raw data to memory & file
-          const currentTimestamp = new Date().toLocaleString();
-          const csvLine = `${currentTimestamp},${line}\n`;
+          // Log only complete rocket telemetry packets. Sensor-check responses,
+          // debug text, and unrelated serial messages must not enter the CSV.
+          if (isValidRocketTelemetryPacket(line)) {
+            const currentTimestamp = new Date().toLocaleString();
+            const csvLine = `${currentTimestamp},${line}\n`;
 
-          // Send to local Vite backend to write to file
-          try {
-            fetch('/api/log', {
-              method: 'POST',
-              body: csvLine
-            }).catch(() => {});
-          } catch(e) {
-            console.error(e);
+            try {
+              fetch('/api/log', {
+                method: 'POST',
+                body: csvLine
+              }).catch(() => {});
+            } catch (e) {
+              console.error(e);
+            }
           }
 
           try {
-            // Expected format depends on packet. Example placeholder parsing:
+            if (line.startsWith('$RTG,')) {
+              const parts = line.split(',');
+              const packetType = parts[1];
+
+              if (packetType === '1' || packetType === '2' || packetType === '3') {
+                const sensor = SENSOR_CHECKS[Number(packetType) - 1];
+                setSensorChecks((checks) => {
+                  const updatedChecks = {
+                    ...checks,
+                    [sensor]: true
+                  };
+                  if (SENSOR_CHECKS.every((check) => updatedChecks[check])) {
+                    setIsAvionicsCheckRunning(false);
+                  }
+                  return updatedChecks;
+                });
+                continue;
+              }
+
+              if (packetType === 'state') {
+                const stateNumber = Number(parts[2]);
+                if (FLIGHT_STATES[stateNumber]) {
+                  remoteFlightStateRef.current = true;
+                  setFlightState((state) => {
+                    const updatedState = { ...state };
+                    for (let index = 1; index <= stateNumber; index += 1) {
+                      updatedState[FLIGHT_STATES[index]] = true;
+                    }
+                    return updatedState;
+                  });
+                }
+                if (parts.length <= 3) continue;
+              }
+            }
+
+            // Legacy checkpoint/state strings remain accepted for compatibility.
+            if (line.startsWith('CHECKPOINT|')) {
+              const [, checkpoint, status] = line.split('|');
+              if (SENSOR_CHECKS.includes(checkpoint)) {
+                setSensorChecks((checks) => ({
+                  ...checks,
+                  [checkpoint]: status === 'PASS'
+                }));
+              }
+              continue;
+            }
+
+            if (line.startsWith('STATE|')) {
+              const stateNumber = Number(line.split('|')[1]);
+              if (FLIGHT_STATES[stateNumber]) {
+                remoteFlightStateRef.current = true;
+                setFlightState((state) => {
+                  const updatedState = { ...state };
+                  for (let index = 1; index <= stateNumber; index += 1) {
+                    updatedState[FLIGHT_STATES[index]] = true;
+                  }
+                  return updatedState;
+                });
+              }
+              continue;
+            }
+
+            // Legacy telemetry format:
             // "1,vx,vy,vz,ax,ay,az,roll,pitch,yaw,alt,pressure"
             // "2,lat,lon,vbat,current,t1,t2"
-            const parts = line.split(',');
+            const parts = line.startsWith('$RTG,state,')
+              ? line.split(',').slice(2)
+              : line.split(',');
             const packetId = parseInt(parts[0]);
             
             if (packetId === 1 && parts.length >= 10) {
@@ -337,8 +486,12 @@ function App() {
       telemetryHistory={telemetryHistory} 
       fullHistory={fullHistory} 
       flightState={flightState} 
+      sensorChecks={sensorChecks}
+      isAvionicsCheckRunning={isAvionicsCheckRunning}
+      isLaunchReady={isLaunchReady}
       launchpadDistance={launchpadDistance}
       launchpadCoords={launchpadCoords}
+      onCheckAvionics={handleCheckAvionics}
       onReadyToLaunch={handleReadyToLaunch}
     />;
   }

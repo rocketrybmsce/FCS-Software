@@ -53,10 +53,10 @@ Since launch sites often lack internet, the map uses cached offline tiles instea
 For the distance calculator to work, it needs to know where the antenna is located.
 1. In the \bmsce-rocketry-app\ folder, create a new file named \.env\.
 2. Add your launchpad/ground station GPS coordinates:
-\\\env
+```env
 VITE_GROUND_STATION_LAT=12.9410
 VITE_GROUND_STATION_LON=77.5655
-\\\
+```
 
 ---
 
@@ -86,17 +86,56 @@ npm run dev
 
 ---
 
-## 📡 Serial Data Protocol Protocol
+## 📡 Serial Data Protocol
 
-The software expects the receiver to forward comma-separated string packets ending in a newline (\\n\). It sorts data based on the leading Packet ID.
+Packets are plain strings terminated by `\n`.
 
-**Packet Type 1 (IMU & Barometer Data @ High Frequency):**
-1,vx,vy,vz,ax,ay,az,roll,pitch,yaw,alt,pressure\
-*Example: \1,0,0,50.5,0,0,9.8,0.1,0.2,-0.1,1400.2,85000\*
+**Ground station to rocket:**
 
-**Packet Type 2 (GPS & Systems Data @ Low Frequency):**
-2,lat,lon,vbat,current,t1,t2\
-*Example: \2,12.9415,77.5660,12.4,1.5,25.0,24.0\*
+```text
+$GTR,Check
+$GTR,Ready
+```
+
+The rocket confirms the three sensors with `$RTG,1` (barometer), `$RTG,2`
+(IMU), and `$RTG,3` (GPS).
+
+**Rocket telemetry:**
+
+```text
+$RTG,state,1,vx,vy,vz,ax,ay,az,roll,pitch,yaw,alt,pressure
+$RTG,state,2,lat,lon,vbat,current,t1,t2
+```
+
+The numeric `state` value is the flight state received from the rocket:
+
+1. Motor Ignited
+2. Motor Burnout
+3. Apogee Reached
+4. Recovery Triggered
+5. Ground Reached
+
+### Protocol rules
+
+- Use plain ASCII strings, not JSON.
+- Terminate every packet with a newline (`\n`).
+- `$GTR,Check` starts the sensor-check sequence.
+- `$GTR,Ready` marks the rocket ready for launch.
+- `$RTG,1` confirms the barometer, `$RTG,2` confirms the IMU, and `$RTG,3`
+  confirms the GPS.
+- `$RTG,state,1,...` contains IMU/barometer telemetry and must contain 14
+  comma-separated fields.
+- `$RTG,state,2,...` contains GPS/system telemetry and must contain 10
+  comma-separated fields.
+- The `state` field must be a valid flight-state number.
+- Only valid `$RTG,state,1,...` and `$RTG,state,2,...` packets are written to
+  the CSV flight log.
+- Sensor acknowledgements, debug messages, startup text, malformed packets,
+  and unrelated serial data are not written to the CSV log.
+
+The CSV flight log stores only valid `$RTG,state,1,...` and
+`$RTG,state,2,...` telemetry packets. Sensor-check responses, debug messages,
+startup text, malformed packets, and unrelated serial data are excluded.
 
 ---
 

@@ -286,12 +286,4 @@ The receiver should not mix human-readable debug output into the telemetry
 stream. If debugging is required, use a separate serial interface or disable
 debug output before flight operations.
 
----
 
-## 🔬 Checkpoint Verification Logic
-The software dynamically reads physics data to trigger checks:
-1. **Motor Ignited**: Vertical Acceleration (\a\) spikes > 15 m/s².
-2. **Motor Burnout**: Sustained ignition drops to coast phase (\a\ < 5 m/s²).
-3. **Apogee Reached**: Vertical Velocity (\z\) drops below zero.
-4. **Recovery Triggered**: Post-apogee shock spike detected (\v\ > 10 m/s²).
-5. **Ground Reached**: Recovery is active and overall speed drops near zero (\v\ < 1 m/s).

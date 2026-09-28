@@ -53,10 +53,10 @@ Since launch sites often lack internet, the map uses cached offline tiles instea
 For the distance calculator to work, it needs to know where the antenna is located.
 1. In the \bmsce-rocketry-app\ folder, create a new file named \.env\.
 2. Add your launchpad/ground station GPS coordinates:
-\\\env
+```env
 VITE_GROUND_STATION_LAT=12.9410
 VITE_GROUND_STATION_LON=77.5655
-\\\
+```
 
 ---
 
@@ -86,7 +86,7 @@ npm run dev
 
 ---
 
-## 📡 Serial Data Protocol Protocol
+## 📡 Serial Data Protocol
 
 The software expects the receiver to forward comma-separated string packets ending in a newline (\\n\). It sorts data based on the leading Packet ID.
 

@@ -4,7 +4,7 @@ import TelemetryGraphs from './TelemetryGraphs';
 import MapViewer from './MapViewer';
 import LeftPanel from './LeftPanel';
 
-const Dashboard = ({ telemetryData, telemetryHistory, fullHistory, flightState, launchpadDistance, launchpadCoords, onReadyToLaunch }) => {
+const Dashboard = ({ telemetryData, telemetryHistory, fullHistory, flightState, sensorChecks, isAvionicsCheckRunning, isLaunchReady, launchpadDistance, launchpadCoords, onCheckAvionics, onReadyToLaunch }) => {
   return (
     <div style={{
       display: 'flex',
@@ -30,8 +30,12 @@ const Dashboard = ({ telemetryData, telemetryHistory, fullHistory, flightState, 
           telemetryHistory={telemetryHistory} 
           fullHistory={fullHistory} 
           flightState={flightState}
+          sensorChecks={sensorChecks}
+          isAvionicsCheckRunning={isAvionicsCheckRunning}
+          isLaunchReady={isLaunchReady}
           launchpadDistance={launchpadDistance}
           launchpadCoords={launchpadCoords}
+          onCheckAvionics={onCheckAvionics}
           onReadyToLaunch={onReadyToLaunch}
         />
       </div>

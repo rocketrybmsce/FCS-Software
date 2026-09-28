@@ -1,7 +1,7 @@
 import React from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
-const LeftPanel = ({ telemetryData, telemetryHistory, fullHistory, flightState, launchpadDistance, launchpadCoords, onReadyToLaunch }) => {
+const LeftPanel = ({ telemetryData, telemetryHistory, fullHistory, flightState, sensorChecks, isAvionicsCheckRunning, isLaunchReady, launchpadDistance, launchpadCoords, onCheckAvionics, onReadyToLaunch }) => {
   return (
     <div style={{
       flex: 1,
@@ -90,6 +90,32 @@ const LeftPanel = ({ telemetryData, telemetryHistory, fullHistory, flightState, 
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, minWidth: 0, backgroundColor: 'rgba(0, 0, 0, 0.2)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', padding: '5px', overflowY: 'auto' }}>
           <h3 style={{ margin: '0 0 5px 0', fontSize: '0.85rem', textAlign: 'center', color: '#fff', borderBottom: '1px solid #444', paddingBottom: '3px', fontWeight: 'normal' }}>Checkpoints</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.75rem', marginTop: '5px' }}>
+            <div style={{ color: '#ccc', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Pre-launch avionics</div>
+            {['barometer', 'IMU', 'GPS'].map((sensor) => (
+              <div key={sensor} style={{ color: sensorChecks?.[sensor] ? '#10b981' : '#888', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span>{sensorChecks?.[sensor] ? '✅' : '⏳'}</span>
+                <span>{sensor}</span>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={onCheckAvionics}
+              disabled={isAvionicsCheckRunning || isLaunchReady}
+              style={{
+                marginTop: '2px',
+                padding: '6px',
+                border: '1px solid rgba(255,255,255,0.2)',
+                borderRadius: '4px',
+                backgroundColor: isAvionicsCheckRunning || isLaunchReady ? '#374151' : '#0f766e',
+                color: 'white',
+                cursor: isAvionicsCheckRunning || isLaunchReady ? 'not-allowed' : 'pointer',
+                fontWeight: 'bold',
+                fontSize: '0.7rem'
+              }}
+            >
+              {isAvionicsCheckRunning ? 'Checking Avionics...' : 'Check Avionics'}
+            </button>
+            <div style={{ color: '#ccc', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: '5px' }}>Flight state</div>
             <div style={{ color: flightState?.motorIgnited ? '#10b981' : '#888', display: 'flex', alignItems: 'center', gap: '6px' }}>
               <span>{flightState?.motorIgnited ? '✅' : '⏳'}</span> 
               <span>Motor Ignited</span>
@@ -154,14 +180,15 @@ const LeftPanel = ({ telemetryData, telemetryHistory, fullHistory, flightState, 
             
             {/* Ready to Launch button */}
             <button 
-              onClick={onReadyToLaunch} 
+              onClick={onReadyToLaunch}
+              disabled={!['barometer', 'IMU', 'GPS'].every((sensor) => sensorChecks?.[sensor]) || isLaunchReady}
               style={{
-                backgroundColor: '#2b6cb0', 
+                backgroundColor: !['barometer', 'IMU', 'GPS'].every((sensor) => sensorChecks?.[sensor]) || isLaunchReady ? '#374151' : '#2b6cb0',
                 color: 'white', 
                 border: '1px solid rgba(255,255,255,0.2)', 
                 borderRadius: '4px', 
                 padding: '5px 12px', 
-                cursor: 'pointer', 
+                cursor: !['barometer', 'IMU', 'GPS'].every((sensor) => sensorChecks?.[sensor]) || isLaunchReady ? 'not-allowed' : 'pointer',
                 fontWeight: 'bold',
                 fontSize: '0.75rem',
                 letterSpacing: '0.5px',
@@ -178,7 +205,7 @@ const LeftPanel = ({ telemetryData, telemetryHistory, fullHistory, flightState, 
                 e.target.style.transform = 'none';
               }}
             >
-              Ready to Launch
+              {isLaunchReady ? 'Launch Ready' : 'Ready to Launch'}
             </button>
           </div>
         </div>

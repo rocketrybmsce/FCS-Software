@@ -1,12 +1,21 @@
 # BMSCE Rocketry Ground Station Dashboard
 
-A high-performance, offline-capable Ground Station dashboard built for the **BMSCE Rocketry** club. This application connects directly to flight hardware via the browser's Web Serial API to receive, visualize, log, and analyze flight telemetry in real-time.
+The BMSCE Rocketry Ground Station is a browser-based flight-control dashboard
+for monitoring an ESP32/LoRa rocket receiver. It connects to the receiver over
+the browser's Web Serial API, displays live telemetry, performs pre-launch
+avionics checks, tracks flight-state checkpoints, plots GPS position, and
+stores validated telemetry in a CSV flight log.
+
+The application is intended for a local ground-station computer. It does not
+require a cloud service or an external serial bridge.
 
 ## 🌟 Key Features
 - **Live Web Serial Connectivity**: Connect natively to receiver modules (ESP32/LoRa) directly through the browser. No external Python scripts required.
 - **Flight Checkpoints Checkmarks**: Real-time detection of flight events (Motor Ignited, Motor Burnout, Apogee Reached, Recovery Triggered, Ground Reached) using acceleration and velocity data.
 - **Real-Time Data Visualization**: High-performance React/Recharts plotting Pressure, Temperature (T1/T2), Distance vs. Time, and Height vs. Time.
-- **Automated CSV Background Logging**: A custom local backend plugin automatically timestamps and continuously appends all incoming raw serial data to \public/flight_log.csv\ completely transparently.
+- **Validated CSV Logging**: Only correctly formatted rocket telemetry packets
+  are timestamped and appended to `public/flight_log.csv`; sensor responses,
+  debug text, malformed packets, and unrelated serial data are excluded.
 - **3D Rocket Orientation**: Live 3D model visualization responding to incoming Pitch, Yaw, and Roll IMU data using React Three Fiber.
 - **Offline 2D Mapping**: Fully local GPS routing plotted on a Leaflet map utilizing locally cached map tiles, ensuring reliability in remote launch environments without internet.
 - **Dynamic Distance Calculation**: Uses the Haversine formula to compute accurate 2D surface distance relative to customizable Ground Station coordinates.
@@ -30,59 +39,111 @@ A high-performance, offline-capable Ground Station dashboard built for the **BMS
 ## 🚀 Installation Guide
 
 ### Step 1: Clone and Install
-Open your terminal or command prompt and run the following commands:
-1. Clone the repository (if you haven't already and have a remote URL)     
+Open PowerShell, Command Prompt, or a terminal and run:
+
+```bash
 git clone https://github.com/Suprabh07/FCS_Software
-
-2. Navigate to the App directory   
-cd bmsce-rocketry-app
-
-3. Install all necessary NPM packages     
+cd FCS-Software/bmsce-rocketry-app
 npm install
+```
+
+The `npm install` command uses the dependency versions declared in
+`bmsce-rocketry-app/package.json`.
 
 ### Step 2: Configure Offline Map Tiles (CRITICAL for No-Internet Launches)
 Since launch sites often lack internet, the map uses cached offline tiles instead of live Google/OSM servers.
-1. Download the map tiles zip file from this specific Google Drive link:
-   👉 **[Download Map Tiles](https://drive.google.com/file/d/1fl1dtvSjqZJmKBLjTjwtNxQKtdUCdCX2/view?usp=sharing)**
-2. Navigate to the \public\ folder inside the \bmsce-rocketry-app\ directory.
-3. Extract the downloaded zip directly into public.
-4. Ensure the folder structure is perfectly aligned like this:
-   \bmsce-rocketry-app/public/map_tiles/{z}/{x}/{y}.png\
+1. Download the map tiles archive from
+   **[Download Map Tiles](https://drive.google.com/file/d/1fl1dtvSjqZJmKBLjTjwtNxQKtdUCdCX2/view?usp=sharing)**.
+2. Extract it into `bmsce-rocketry-app/public`.
+3. Confirm the resulting layout is:
+
+```text
+bmsce-rocketry-app/public/map_tiles/{z}/{x}/{y}.png
+```
+
+If the tiles are missing, the dashboard can still start, but the offline map
+will not render its cached background.
 
 ### Step 3: Set Ground Station GPS Coordinates
 For the distance calculator to work, it needs to know where the antenna is located.
-1. In the \bmsce-rocketry-app\ folder, create a new file named \.env\.
-2. Add your launchpad/ground station GPS coordinates:
+1. In `bmsce-rocketry-app`, create a file named `.env`.
+2. Add the ground-station coordinates:
 ```env
 VITE_GROUND_STATION_LAT=12.9410
 VITE_GROUND_STATION_LON=77.5655
 ```
 
+These values are used as the reference point for the Haversine ground-station
+distance calculation. Restart Vite after changing `.env`.
+
 ---
 
 ## 🏃‍♂️ Running the Dashboard
 
-Start the local development server (this enables both the UI and the automated CSV logger):
+From `bmsce-rocketry-app`, start the local development server:
 
+```bash
 npm run dev
+```
 
+Open **Google Chrome** or **Microsoft Edge** and navigate to
+`http://localhost:5173/`.
 
-1. Open **Google Chrome** or **Edge**.
-2. Navigate to \http://localhost:5173\.
+Useful project commands:
+
+```bash
+npm run lint       # Run ESLint
+npm run build      # Create a production build
+npm run preview    # Preview the production build locally
+```
 
 ---
 
 ## 📖 Usage Guide
 
-**Connecting to the Rocket Receiver:**
-1. On the dashboard loading screen, select your radio receiver's **Baud Rate** from the dropdown loop (Default is \115200\).
-2. Click **START**.
-3. A browser security prompt will appear. Select the COM port (e.g., \COM3\ or \COM5\) corresponding to your plugged-in receiver module.
-4. If valid data is flowing, the dashboard will appear and graphs will animate immediately!
+### Connecting to the rocket receiver
 
-**Where limits and logs are saved:**
-- **CSV Logs**: As soon as connection is established, all raw serial data is automatically logged into \bmsce-rocketry-app/public/flight_log.csv\ with exact PC timestamps.
-- **Flight Checkpoints**: Located next to the Height graph, these will automatically check off as the rocket meets specific acceleration/velocity parameters during flight.
+1. Connect the USB receiver to the ground-station computer.
+2. Confirm that the receiver firmware and the dashboard use the same baud rate.
+   The default is `115200`.
+3. Select the baud rate and click **START**.
+4. In the browser port picker, select the receiver's COM port.
+5. The dashboard opens after the serial connection is established.
+
+The browser may require a secure context. `localhost` is supported by Chrome
+and Edge for Web Serial. The port can be selected only after a user gesture,
+which is why the connection begins with the **START** button.
+
+### Running the avionics check
+
+1. Click **Check Avionics** in the Checkpoints panel.
+2. The dashboard sends `$GTR,Check`.
+3. The rocket checks the barometer, IMU, and GPS.
+4. The rocket sends `$RTG,1`, `$RTG,2`, and `$RTG,3` as each sensor passes.
+5. The dashboard marks each sensor with a checkmark.
+6. **Ready to Launch** remains disabled until all three confirmations arrive.
+7. After all checks pass, click **Ready to Launch**. The dashboard sends
+   `$GTR,Ready`.
+
+When no serial port is available, the development UI simulates the three
+successful sensor responses so the interface can be tested without hardware.
+
+### Telemetry and flight-state display
+
+The dashboard accepts telemetry from the rocket, updates the graphs and map,
+and displays the rocket orientation in the 3D view. Flight-state packets latch
+the corresponding checkpoint and all earlier checkpoints in the sequence.
+
+### CSV log
+
+The local logger appends valid telemetry to:
+
+```text
+bmsce-rocketry-app/public/flight_log.csv
+```
+
+Each saved row contains the computer timestamp followed by the original
+telemetry packet. The file is not a general-purpose serial dump.
 
 ---
 
@@ -97,17 +158,83 @@ $GTR,Check
 $GTR,Ready
 ```
 
+`$GTR` means **Ground To Rocket**. The command is exact and case-sensitive:
+
+| Packet | Meaning |
+|---|---|
+| `$GTR,Check` | Start the barometer, IMU, and GPS check sequence |
+| `$GTR,Ready` | Tell the rocket that the operator has approved launch readiness |
+
 The rocket confirms the three sensors with `$RTG,1` (barometer), `$RTG,2`
-(IMU), and `$RTG,3` (GPS).
+(IMU), and `$RTG,3` (GPS). `$RTG` means **Rocket To Ground**.
+
+| Response | Sensor confirmed |
+|---|---|
+| `$RTG,1` | Barometer |
+| `$RTG,2` | IMU |
+| `$RTG,3` | GPS |
+
+Sensor responses are acknowledgements, not telemetry. They are used to update
+the Checkpoints panel and are never written to the CSV flight log.
 
 **Rocket telemetry:**
 
 ```text
+$RTG,state,1,vx,vy,vz,ax,ay,az,roll,pitch,yaw,alt,pressure\n
+$RTG,state,2,lat,lon,vbat,current,t1,t2\n
+```
+
+The `state` field is the flight state received from the rocket. Packet type `1`
+contains IMU/barometer data; packet type `2` contains GPS/system data.
+
+### Telemetry packet 1: IMU and barometer
+
+```text
 $RTG,state,1,vx,vy,vz,ax,ay,az,roll,pitch,yaw,alt,pressure
+```
+
+| Position | Field | Unit / description |
+|---:|---|---|
+| 1 | `$RTG` | Packet direction marker |
+| 2 | `state` | Literal state marker |
+| 3 | `1` | IMU/barometer packet type |
+| 4 | `vx` | X velocity, m/s |
+| 5 | `vy` | Y velocity, m/s |
+| 6 | `vz` | Z/vertical velocity, m/s |
+| 7 | `ax` | X acceleration, m/s² |
+| 8 | `ay` | Y acceleration, m/s² |
+| 9 | `az` | Z acceleration, m/s² |
+| 10 | `roll` | Roll angle, degrees |
+| 11 | `pitch` | Pitch angle, degrees |
+| 12 | `yaw` | Yaw angle, degrees |
+| 13 | `alt` | Altitude, metres |
+| 14 | `pressure` | Atmospheric pressure, pascals |
+
+This packet must contain exactly 14 comma-separated fields after splitting the
+complete line.
+
+### Telemetry packet 2: GPS and system data
+
+```text
 $RTG,state,2,lat,lon,vbat,current,t1,t2
 ```
 
-The numeric `state` value is the flight state received from the rocket:
+| Position | Field | Unit / description |
+|---:|---|---|
+| 1 | `$RTG` | Packet direction marker |
+| 2 | `state` | Literal state marker |
+| 3 | `2` | GPS/system packet type |
+| 4 | `lat` | Latitude, decimal degrees |
+| 5 | `lon` | Longitude, decimal degrees |
+| 6 | `vbat` | Battery voltage, volts |
+| 7 | `current` | Current, amperes |
+| 8 | `t1` | Temperature channel 1, °C |
+| 9 | `t2` | Temperature channel 2, °C |
+
+This packet must contain exactly 10 comma-separated fields after splitting the
+complete line.
+
+The numeric `state` value is:
 
 1. Motor Ignited
 2. Motor Burnout
@@ -133,9 +260,31 @@ The numeric `state` value is the flight state received from the rocket:
 - Sensor acknowledgements, debug messages, startup text, malformed packets,
   and unrelated serial data are not written to the CSV log.
 
-The CSV flight log stores only valid `$RTG,state,1,...` and
-`$RTG,state,2,...` telemetry packets. Sensor-check responses, debug messages,
-startup text, malformed packets, and unrelated serial data are excluded.
+### Packet examples
+
+Valid examples:
+
+```text
+$RTG,1
+$RTG,2
+$RTG,3
+$RTG,state,1,0.000,0.000,50.500,0.000,0.000,9.810,0.100,0.200,-0.100,1400.200,85000.000
+$RTG,state,2,12.941500,77.566000,12.400,1.500,25.000,24.000
+```
+
+Ignored or invalid examples:
+
+```text
+ESP32 sensor-check test ready
+{"type":"telemetry"}
+$RTG,state,1,missing,fields
+$RTG,state,3,1,2,3
+$RTG,state,2,12.94,77.56,not-a-number,1.5,25,24
+```
+
+The receiver should not mix human-readable debug output into the telemetry
+stream. If debugging is required, use a separate serial interface or disable
+debug output before flight operations.
 
 ---
 

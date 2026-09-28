@@ -13,6 +13,19 @@ const FLIGHT_STATES = {
   5: 'groundReached'
 };
 
+const isValidRocketTelemetryPacket = (line) => {
+  if (!line.startsWith('$RTG,state,')) return false;
+
+  const fields = line.split(',');
+  const packetType = fields[2];
+  const expectedFieldCount = packetType === '1' ? 14 : packetType === '2' ? 10 : 0;
+
+  if (expectedFieldCount === 0 || fields.length !== expectedFieldCount) return false;
+  if (fields[1] !== 'state') return false;
+
+  return fields.slice(3).every((field) => Number.isFinite(Number(field)));
+};
+
 // Utility to calculate 2D distance between ground station and current lat/lon using Haversine
 const calculateDistance = (lat1, lon1, lat2, lon2) => {
   if (!lat1 || !lon1 || !lat2 || !lon2) return 0; // if no GPS
@@ -101,7 +114,7 @@ function App() {
       });
     }
     setIsLaunchReady(true);
-    void sendSerialPacket({ type: 'command', command: 'READY_TO_LAUNCH' });
+    void sendSerialPacket('$GTR,Ready');
   };
 
   // Monitor telemetry to update flight checkpoints
@@ -145,7 +158,7 @@ function App() {
 
     try {
       const writer = port.writable.getWriter();
-      await writer.write(new TextEncoder().encode(`${JSON.stringify(packet)}\n`));
+      await writer.write(new TextEncoder().encode(`${packet}\n`));
       writer.releaseLock();
       return true;
     } catch (error) {
@@ -169,11 +182,7 @@ function App() {
 
     setSensorChecks({ barometer: false, IMU: false, GPS: false });
     setIsAvionicsCheckRunning(true);
-    const sent = await sendSerialPacket({
-      type: 'command',
-      command: 'CHECK_AVIONICS',
-      checkpoints: SENSOR_CHECKS
-    });
+    const sent = await sendSerialPacket('$GTR,Check');
 
     if (!sent) {
       simulateAvionicsCheck();
@@ -302,39 +311,44 @@ function App() {
           const line = lines[i].trim();
           if (!line) continue;
 
-          // Push raw data to memory & file
-          const currentTimestamp = new Date().toLocaleString();
-          const csvLine = `${currentTimestamp},${line}\n`;
+          // Log only complete rocket telemetry packets. Sensor-check responses,
+          // debug text, and unrelated serial messages must not enter the CSV.
+          if (isValidRocketTelemetryPacket(line)) {
+            const currentTimestamp = new Date().toLocaleString();
+            const csvLine = `${currentTimestamp},${line}\n`;
 
-          // Send to local Vite backend to write to file
-          try {
-            fetch('/api/log', {
-              method: 'POST',
-              body: csvLine
-            }).catch(() => {});
-          } catch(e) {
-            console.error(e);
+            try {
+              fetch('/api/log', {
+                method: 'POST',
+                body: csvLine
+              }).catch(() => {});
+            } catch (e) {
+              console.error(e);
+            }
           }
 
           try {
-            if (line.startsWith('{')) {
-              const packet = JSON.parse(line);
+            if (line.startsWith('$RTG,')) {
+              const parts = line.split(',');
+              const packetType = parts[1];
 
-              if (packet.type === 'checkpoint' && SENSOR_CHECKS.includes(packet.checkpoint)) {
+              if (packetType === '1' || packetType === '2' || packetType === '3') {
+                const sensor = SENSOR_CHECKS[Number(packetType) - 1];
                 setSensorChecks((checks) => {
                   const updatedChecks = {
                     ...checks,
-                    [packet.checkpoint]: packet.status === 'pass'
+                    [sensor]: true
                   };
-                  if (packet.status === 'pass' && SENSOR_CHECKS.every((sensor) => updatedChecks[sensor])) {
-                    setIsAvionicsCheckRunning(false);
-                  } else if (packet.status !== 'pass') {
+                  if (SENSOR_CHECKS.every((check) => updatedChecks[check])) {
                     setIsAvionicsCheckRunning(false);
                   }
                   return updatedChecks;
                 });
-              } else if (packet.type === 'flight_state') {
-                const stateNumber = Number(packet.state);
+                continue;
+              }
+
+              if (packetType === 'state') {
+                const stateNumber = Number(parts[2]);
                 if (FLIGHT_STATES[stateNumber]) {
                   remoteFlightStateRef.current = true;
                   setFlightState((state) => {
@@ -345,14 +359,43 @@ function App() {
                     return updatedState;
                   });
                 }
+                if (parts.length <= 3) continue;
+              }
+            }
+
+            // Legacy checkpoint/state strings remain accepted for compatibility.
+            if (line.startsWith('CHECKPOINT|')) {
+              const [, checkpoint, status] = line.split('|');
+              if (SENSOR_CHECKS.includes(checkpoint)) {
+                setSensorChecks((checks) => ({
+                  ...checks,
+                  [checkpoint]: status === 'PASS'
+                }));
               }
               continue;
             }
 
-            // Expected format depends on packet. Example placeholder parsing:
+            if (line.startsWith('STATE|')) {
+              const stateNumber = Number(line.split('|')[1]);
+              if (FLIGHT_STATES[stateNumber]) {
+                remoteFlightStateRef.current = true;
+                setFlightState((state) => {
+                  const updatedState = { ...state };
+                  for (let index = 1; index <= stateNumber; index += 1) {
+                    updatedState[FLIGHT_STATES[index]] = true;
+                  }
+                  return updatedState;
+                });
+              }
+              continue;
+            }
+
+            // Legacy telemetry format:
             // "1,vx,vy,vz,ax,ay,az,roll,pitch,yaw,alt,pressure"
             // "2,lat,lon,vbat,current,t1,t2"
-            const parts = line.split(',');
+            const parts = line.startsWith('$RTG,state,')
+              ? line.split(',').slice(2)
+              : line.split(',');
             const packetId = parseInt(parts[0]);
             
             if (packetId === 1 && parts.length >= 10) {

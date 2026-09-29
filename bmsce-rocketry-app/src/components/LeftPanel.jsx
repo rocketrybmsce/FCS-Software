@@ -1,7 +1,10 @@
 import React from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import sensorConfig from '../config/sensors.json';
 
 const LeftPanel = ({ telemetryData, telemetryHistory, fullHistory, flightState, sensorChecks, isAvionicsCheckRunning, isLaunchReady, launchpadDistance, launchpadCoords, onCheckAvionics, onReadyToLaunch }) => {
+  const allSensorsChecked = sensorConfig.every((sensor) => sensorChecks?.[sensor.name]);
+
   return (
     <div style={{
       flex: 1,
@@ -91,10 +94,10 @@ const LeftPanel = ({ telemetryData, telemetryHistory, fullHistory, flightState, 
           <h3 style={{ margin: '0 0 5px 0', fontSize: '0.85rem', textAlign: 'center', color: '#fff', borderBottom: '1px solid #444', paddingBottom: '3px', fontWeight: 'normal' }}>Checkpoints</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.75rem', marginTop: '5px' }}>
             <div style={{ color: '#ccc', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Pre-launch avionics</div>
-            {['barometer', 'IMU', 'GPS'].map((sensor) => (
-              <div key={sensor} style={{ color: sensorChecks?.[sensor] ? '#10b981' : '#888', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span>{sensorChecks?.[sensor] ? '✅' : '⏳'}</span>
-                <span>{sensor}</span>
+            {sensorConfig.map((sensor) => (
+              <div key={sensor.number} style={{ color: sensorChecks?.[sensor.name] ? '#10b981' : '#888', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span>{sensorChecks?.[sensor.name] ? '✅' : '⏳'}</span>
+                <span>{sensor.name}</span>
               </div>
             ))}
             <button
@@ -181,14 +184,14 @@ const LeftPanel = ({ telemetryData, telemetryHistory, fullHistory, flightState, 
             {/* Ready to Launch button */}
             <button 
               onClick={onReadyToLaunch}
-              disabled={!['barometer', 'IMU', 'GPS'].every((sensor) => sensorChecks?.[sensor]) || isLaunchReady}
+              disabled={!allSensorsChecked || isLaunchReady}
               style={{
-                backgroundColor: !['barometer', 'IMU', 'GPS'].every((sensor) => sensorChecks?.[sensor]) || isLaunchReady ? '#374151' : '#2b6cb0',
+                backgroundColor: !allSensorsChecked || isLaunchReady ? '#374151' : '#2b6cb0',
                 color: 'white', 
                 border: '1px solid rgba(255,255,255,0.2)', 
                 borderRadius: '4px', 
                 padding: '5px 12px', 
-                cursor: !['barometer', 'IMU', 'GPS'].every((sensor) => sensorChecks?.[sensor]) || isLaunchReady ? 'not-allowed' : 'pointer',
+                cursor: !allSensorsChecked || isLaunchReady ? 'not-allowed' : 'pointer',
                 fontWeight: 'bold',
                 fontSize: '0.75rem',
                 letterSpacing: '0.5px',

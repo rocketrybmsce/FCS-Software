@@ -128,6 +128,31 @@ which is why the connection begins with the **START** button.
 When no serial port is available, the development UI simulates the three
 successful sensor responses so the interface can be tested without hardware.
 
+### Sensor configuration
+
+The pre-launch sensor list and its response numbers are maintained in:
+
+```text
+bmsce-rocketry-app/src/config/sensors.json
+```
+
+The file contains one object per sensor:
+
+```json
+[
+  { "name": "barometer", "number": 1 },
+  { "name": "IMU", "number": 2 },
+  { "name": "GPS", "number": 3 }
+]
+```
+
+To add a sensor or change a sensor's response number, edit this JSON file and
+restart the development server. The dashboard uses it for the checklist
+labels, initial checklist state, `$GTR,Check` sensor order, `$RTG,<number>`
+acknowledgement mapping, and the Ready-to-Launch gate. Sensor numbers should be
+unique positive integers, and names should match the names implemented by the
+rocket firmware.
+
 ### Telemetry and flight-state display
 
 The dashboard accepts telemetry from the rocket, updates the graphs and map,

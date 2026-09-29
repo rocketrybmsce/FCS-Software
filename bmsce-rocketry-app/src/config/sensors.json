@@ -1,0 +1,14 @@
+[
+  {
+    "name": "Barometer",
+    "number": 1
+  },
+  {
+    "name": "IMU",
+    "number": 2
+  },
+  {
+    "name": "GPS",
+    "number": 3
+  }
+]

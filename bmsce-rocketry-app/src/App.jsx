@@ -3,8 +3,13 @@ import './App.css';
 import rocketImg from './assets/rocket.png';
 import logoImg from './assets/logo.png';
 import Dashboard from './components/Dashboard';
+import sensorConfig from './config/sensors.json';
 
-const SENSOR_CHECKS = ['barometer', 'IMU', 'GPS'];
+const SENSOR_CHECKS = sensorConfig.map((sensor) => sensor.name);
+const SENSOR_NUMBERS = new Map(sensorConfig.map((sensor) => [sensor.number, sensor.name]));
+const INITIAL_SENSOR_CHECKS = Object.fromEntries(
+  SENSOR_CHECKS.map((sensor) => [sensor, false])
+);
 const FLIGHT_STATES = {
   1: 'motorIgnited',
   2: 'motorBurnout',
@@ -80,11 +85,7 @@ function App() {
     recoveryTriggered: false,
     groundReached: false
   });
-  const [sensorChecks, setSensorChecks] = useState({
-    barometer: false,
-    IMU: false,
-    GPS: false
-  });
+  const [sensorChecks, setSensorChecks] = useState(INITIAL_SENSOR_CHECKS);
   const [isAvionicsCheckRunning, setIsAvionicsCheckRunning] = useState(false);
   const [isLaunchReady, setIsLaunchReady] = useState(false);
 
@@ -180,7 +181,7 @@ function App() {
   const handleCheckAvionics = async () => {
     if (isLaunchReady || isAvionicsCheckRunning) return;
 
-    setSensorChecks({ barometer: false, IMU: false, GPS: false });
+    setSensorChecks(INITIAL_SENSOR_CHECKS);
     setIsAvionicsCheckRunning(true);
     const sent = await sendSerialPacket('$GTR,Check');
 
@@ -332,8 +333,9 @@ function App() {
               const parts = line.split(',');
               const packetType = parts[1];
 
-              if (packetType === '1' || packetType === '2' || packetType === '3') {
-                const sensor = SENSOR_CHECKS[Number(packetType) - 1];
+              if (parts.length === 2 && /^\d+$/.test(packetType)) {
+                const sensor = SENSOR_NUMBERS.get(Number(packetType));
+                if (!sensor) continue;
                 setSensorChecks((checks) => {
                   const updatedChecks = {
                     ...checks,

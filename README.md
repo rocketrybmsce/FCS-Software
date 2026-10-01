@@ -11,7 +11,7 @@ require a cloud service or an external serial bridge.
 
 ## 🌟 Key Features
 - **Live Web Serial Connectivity**: Connect natively to receiver modules (ESP32/LoRa) directly through the browser. No external Python scripts required.
-- **Flight Checkpoints Checkmarks**: Real-time detection of flight events (Motor Ignited, Motor Burnout, Apogee Reached, Recovery Triggered, Ground Reached) using acceleration and velocity data.
+- **Flight Checkpoints Checkmarks**: Real-time detection of flight states (Launch Ready, Motor Ignited, Motor Burnout, Apogee Reached, Recovery Triggered, Ground Reached) using operator confirmation, acceleration, and velocity data.
 - **Real-Time Data Visualization**: High-performance React/Recharts plotting Pressure, Temperature (T1/T2), Distance vs. Time, and Height vs. Time.
 - **Validated CSV Logging**: Only correctly formatted rocket telemetry packets
   are timestamped and appended to `public/flight_log.csv`; sensor responses,
@@ -259,13 +259,18 @@ $RTG,state,2,lat,lon,vbat,current,t1,t2
 This packet must contain exactly 10 comma-separated fields after splitting the
 complete line.
 
-The numeric `state` value is:
+The numeric `STATE|<number>` value is:
 
-1. Motor Ignited
-2. Motor Burnout
-3. Apogee Reached
-4. Recovery Triggered
-5. Ground Reached
+1. Launch Ready
+2. Motor Ignited
+3. Motor Burnout
+4. Apogee Reached
+5. Recovery Triggered
+6. Ground Reached
+
+`Launch Ready` is set when the avionics checks pass and the operator clicks
+**Ready to Launch**. Each later state latches all preceding states in the
+dashboard.
 
 ### Protocol rules
 

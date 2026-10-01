@@ -11,11 +11,12 @@ const INITIAL_SENSOR_CHECKS = Object.fromEntries(
   SENSOR_CHECKS.map((sensor) => [sensor, false])
 );
 const FLIGHT_STATES = {
-  1: 'motorIgnited',
-  2: 'motorBurnout',
-  3: 'apogeeReached',
-  4: 'recoveryTriggered',
-  5: 'groundReached'
+  1: 'launchReady',
+  2: 'motorIgnited',
+  3: 'motorBurnout',
+  4: 'apogeeReached',
+  5: 'recoveryTriggered',
+  6: 'groundReached'
 };
 
 const isValidRocketTelemetryPacket = (line) => {
@@ -79,6 +80,7 @@ function App() {
   
   // Flight state checkpoints
   const [flightState, setFlightState] = useState({
+    launchReady: false,
     motorIgnited: false,
     motorBurnout: false,
     apogeeReached: false,
@@ -115,6 +117,7 @@ function App() {
       });
     }
     setIsLaunchReady(true);
+    setFlightState((state) => ({ ...state, launchReady: true }));
     void sendSerialPacket('$GTR,Ready');
   };
 
@@ -350,17 +353,6 @@ function App() {
               }
 
               if (packetType === 'state') {
-                const stateNumber = Number(parts[2]);
-                if (FLIGHT_STATES[stateNumber]) {
-                  remoteFlightStateRef.current = true;
-                  setFlightState((state) => {
-                    const updatedState = { ...state };
-                    for (let index = 1; index <= stateNumber; index += 1) {
-                      updatedState[FLIGHT_STATES[index]] = true;
-                    }
-                    return updatedState;
-                  });
-                }
                 if (parts.length <= 3) continue;
               }
             }
@@ -386,6 +378,7 @@ function App() {
                   for (let index = 1; index <= stateNumber; index += 1) {
                     updatedState[FLIGHT_STATES[index]] = true;
                   }
+                  if (updatedState.launchReady) setIsLaunchReady(true);
                   return updatedState;
                 });
               }

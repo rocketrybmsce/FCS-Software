@@ -119,6 +119,10 @@ const LeftPanel = ({ telemetryData, telemetryHistory, fullHistory, flightState, 
               {isAvionicsCheckRunning ? 'Checking Avionics...' : 'Check Avionics'}
             </button>
             <div style={{ color: '#ccc', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: '5px' }}>Flight state</div>
+            <div style={{ color: flightState?.launchReady ? '#10b981' : '#888', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span>{flightState?.launchReady ? '✅' : '⏳'}</span>
+              <span>Launch Ready</span>
+            </div>
             <div style={{ color: flightState?.motorIgnited ? '#10b981' : '#888', display: 'flex', alignItems: 'center', gap: '6px' }}>
               <span>{flightState?.motorIgnited ? '✅' : '⏳'}</span> 
               <span>Motor Ignited</span>

@@ -20,14 +20,15 @@ const FLIGHT_STATES = {
 };
 
 const isValidRocketTelemetryPacket = (line) => {
-  if (!line.startsWith('$RTG,state,')) return false;
-
   const fields = line.split(',');
+  if (fields[0] !== '$RTG' || fields.length < 3) return false;
+
+  const state = Number(fields[1]);
   const packetType = fields[2];
   const expectedFieldCount = packetType === '1' ? 14 : packetType === '2' ? 10 : 0;
 
   if (expectedFieldCount === 0 || fields.length !== expectedFieldCount) return false;
-  if (fields[1] !== 'state') return false;
+  if (!Number.isInteger(state) || !FLIGHT_STATES[state]) return false;
 
   return fields.slice(3).every((field) => Number.isFinite(Number(field)));
 };
@@ -334,10 +335,10 @@ function App() {
           try {
             if (line.startsWith('$RTG,')) {
               const parts = line.split(',');
-              const packetType = parts[1];
+              const packetType = parts[2];
 
-              if (parts.length === 2 && /^\d+$/.test(packetType)) {
-                const sensor = SENSOR_NUMBERS.get(Number(packetType));
+              if (parts.length === 2 && /^\d+$/.test(parts[1])) {
+                const sensor = SENSOR_NUMBERS.get(Number(parts[1]));
                 if (!sensor) continue;
                 setSensorChecks((checks) => {
                   const updatedChecks = {
@@ -352,8 +353,19 @@ function App() {
                 continue;
               }
 
-              if (packetType === 'state') {
-                if (parts.length <= 3) continue;
+              if (parts.length >= 3 && /^\d+$/.test(parts[1]) && (packetType === '1' || packetType === '2')) {
+                const stateNumber = Number(parts[1]);
+                if (!FLIGHT_STATES[stateNumber]) continue;
+
+                remoteFlightStateRef.current = true;
+                setFlightState((state) => {
+                  const updatedState = { ...state };
+                  for (let index = 1; index <= stateNumber; index += 1) {
+                    updatedState[FLIGHT_STATES[index]] = true;
+                  }
+                  if (updatedState.launchReady) setIsLaunchReady(true);
+                  return updatedState;
+                });
               }
             }
 
@@ -388,7 +400,7 @@ function App() {
             // Legacy telemetry format:
             // "1,vx,vy,vz,ax,ay,az,roll,pitch,yaw,alt,pressure"
             // "2,lat,lon,vbat,current,t1,t2"
-            const parts = line.startsWith('$RTG,state,')
+            const parts = line.startsWith('$RTG,')
               ? line.split(',').slice(2)
               : line.split(',');
             const packetId = parseInt(parts[0]);

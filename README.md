@@ -205,8 +205,8 @@ the Checkpoints panel and are never written to the CSV flight log.
 **Rocket telemetry:**
 
 ```text
-$RTG,state,1,vx,vy,vz,ax,ay,az,roll,pitch,yaw,alt,pressure\n
-$RTG,state,2,lat,lon,vbat,current,t1,t2\n
+$RTG,1,1,vx,vy,vz,ax,ay,az,roll,pitch,yaw,alt,pressure\n
+$RTG,1,2,lat,lon,vbat,current,t1,t2\n
 ```
 
 The `state` field is the flight state received from the rocket. Packet type `1`
@@ -215,13 +215,13 @@ contains IMU/barometer data; packet type `2` contains GPS/system data.
 ### Telemetry packet 1: IMU and barometer
 
 ```text
-$RTG,state,1,vx,vy,vz,ax,ay,az,roll,pitch,yaw,alt,pressure
+$RTG,1,1,vx,vy,vz,ax,ay,az,roll,pitch,yaw,alt,pressure
 ```
 
 | Position | Field | Unit / description |
 |---:|---|---|
 | 1 | `$RTG` | Packet direction marker |
-| 2 | `state` | Literal state marker |
+| 2 | `state` | Numeric flight-state value |
 | 3 | `1` | IMU/barometer packet type |
 | 4 | `vx` | X velocity, m/s |
 | 5 | `vy` | Y velocity, m/s |
@@ -241,13 +241,13 @@ complete line.
 ### Telemetry packet 2: GPS and system data
 
 ```text
-$RTG,state,2,lat,lon,vbat,current,t1,t2
+$RTG,1,2,lat,lon,vbat,current,t1,t2
 ```
 
 | Position | Field | Unit / description |
 |---:|---|---|
 | 1 | `$RTG` | Packet direction marker |
-| 2 | `state` | Literal state marker |
+| 2 | `state` | Numeric flight-state value |
 | 3 | `2` | GPS/system packet type |
 | 4 | `lat` | Latitude, decimal degrees |
 | 5 | `lon` | Longitude, decimal degrees |
@@ -280,12 +280,12 @@ dashboard.
 - `$GTR,Ready` marks the rocket ready for launch.
 - `$RTG,1` confirms the barometer, `$RTG,2` confirms the IMU, and `$RTG,3`
   confirms the GPS.
-- `$RTG,state,1,...` contains IMU/barometer telemetry and must contain 14
+- `$RTG,<state>,1,...` contains IMU/barometer telemetry and must contain 14
   comma-separated fields.
-- `$RTG,state,2,...` contains GPS/system telemetry and must contain 10
+- `$RTG,<state>,2,...` contains GPS/system telemetry and must contain 10
   comma-separated fields.
 - The `state` field must be a valid flight-state number.
-- Only valid `$RTG,state,1,...` and `$RTG,state,2,...` packets are written to
+- Only valid `$RTG,<state>,1,...` and `$RTG,<state>,2,...` packets are written to
   the CSV flight log.
 - Sensor acknowledgements, debug messages, startup text, malformed packets,
   and unrelated serial data are not written to the CSV log.
@@ -298,8 +298,8 @@ Valid examples:
 $RTG,1
 $RTG,2
 $RTG,3
-$RTG,state,1,0.000,0.000,50.500,0.000,0.000,9.810,0.100,0.200,-0.100,1400.200,85000.000
-$RTG,state,2,12.941500,77.566000,12.400,1.500,25.000,24.000
+$RTG,1,1,0.000,0.000,50.500,0.000,0.000,9.810,0.100,0.200,-0.100,1400.200,85000.000
+$RTG,1,2,12.941500,77.566000,12.400,1.500,25.000,24.000
 ```
 
 Ignored or invalid examples:
@@ -307,9 +307,9 @@ Ignored or invalid examples:
 ```text
 ESP32 sensor-check test ready
 {"type":"telemetry"}
-$RTG,state,1,missing,fields
-$RTG,state,3,1,2,3
-$RTG,state,2,12.94,77.56,not-a-number,1.5,25,24
+$RTG,1,1,missing,fields
+$RTG,3,3,1,2,3
+$RTG,1,2,12.94,77.56,not-a-number,1.5,25,24
 ```
 
 The receiver should not mix human-readable debug output into the telemetry

@@ -205,7 +205,7 @@ the Checkpoints panel and are never written to the CSV flight log.
 **Rocket telemetry:**
 
 ```text
-$RTG,1,1,vx,vy,vz,ax,ay,az,roll,pitch,yaw,alt,pressure\n
+$RTG,1,1,ax,ay,az,roll,pitch,yaw,alt,pressure\n
 $RTG,1,2,lat,lon,vbat,current,t1,t2\n
 ```
 
@@ -215,7 +215,7 @@ contains IMU/barometer data; packet type `2` contains GPS/system data.
 ### Telemetry packet 1: IMU and barometer
 
 ```text
-$RTG,1,1,vx,vy,vz,ax,ay,az,roll,pitch,yaw,alt,pressure
+$RTG,1,1,ax,ay,az,roll,pitch,yaw,alt,pressure
 ```
 
 | Position | Field | Unit / description |
@@ -223,20 +223,20 @@ $RTG,1,1,vx,vy,vz,ax,ay,az,roll,pitch,yaw,alt,pressure
 | 1 | `$RTG` | Packet direction marker |
 | 2 | `state` | Numeric flight-state value |
 | 3 | `1` | IMU/barometer packet type |
-| 4 | `vx` | X velocity, m/s |
-| 5 | `vy` | Y velocity, m/s |
-| 6 | `vz` | Z/vertical velocity, m/s |
-| 7 | `ax` | X acceleration, m/s² |
-| 8 | `ay` | Y acceleration, m/s² |
-| 9 | `az` | Z acceleration, m/s² |
-| 10 | `roll` | Roll angle, degrees |
-| 11 | `pitch` | Pitch angle, degrees |
-| 12 | `yaw` | Yaw angle, degrees |
-| 13 | `alt` | Altitude, metres |
-| 14 | `pressure` | Atmospheric pressure, pascals |
+| 4 | `ax` | X acceleration, m/s² |
+| 5 | `ay` | Y acceleration, m/s² |
+| 6 | `az` | Z acceleration, m/s² |
+| 7 | `roll` | Roll angle, degrees |
+| 8 | `pitch` | Pitch angle, degrees |
+| 9 | `yaw` | Yaw angle, degrees |
+| 10 | `alt` | Altitude, metres |
+| 11 | `pressure` | Atmospheric pressure, pascals |
 
-This packet must contain exactly 14 comma-separated fields after splitting the
-complete line.
+This packet must contain exactly 11 comma-separated fields after splitting the
+complete line. The dashboard calculates `vx`, `vy`, and `vz` by integrating
+the acceleration values over the time between packets, then calculates total
+velocity `v` for the graphs and flight-state checks. This assumes the
+acceleration values have already been corrected for gravity and sensor bias.
 
 ### Telemetry packet 2: GPS and system data
 
@@ -298,7 +298,7 @@ Valid examples:
 $RTG,1
 $RTG,2
 $RTG,3
-$RTG,1,1,0.000,0.000,50.500,0.000,0.000,9.810,0.100,0.200,-0.100,1400.200,85000.000
+$RTG,1,1,0.000,0.000,9.810,0.100,0.200,-0.100,1400.200,85000.000
 $RTG,1,2,12.941500,77.566000,12.400,1.500,25.000,24.000
 ```
 

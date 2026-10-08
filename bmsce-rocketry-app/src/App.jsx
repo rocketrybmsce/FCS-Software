@@ -25,7 +25,7 @@ const isValidRocketTelemetryPacket = (line) => {
 
   const state = Number(fields[1]);
   const packetType = fields[2];
-  const expectedFieldCount = packetType === '1' ? 14 : packetType === '2' ? 10 : 0;
+  const expectedFieldCount = packetType === '1' ? 11 : packetType === '2' ? 10 : 0;
 
   if (expectedFieldCount === 0 || fields.length !== expectedFieldCount) return false;
   if (!Number.isInteger(state) || !FLIGHT_STATES[state]) return false;
@@ -75,6 +75,15 @@ function App() {
 
   // State to hold history for the graphs
   const [telemetryHistory, setTelemetryHistory] = useState([]);
+  const calculatedVelocityRef = useRef({
+    vx: 0,
+    vy: 0,
+    vz: 0,
+    ax: 0,
+    ay: 0,
+    az: 0,
+    timestamp: null
+  });
   
   // State to hold full trajectory for the Height vs Time graph
   const [fullHistory, setFullHistory] = useState([]);
@@ -299,9 +308,18 @@ function App() {
     const textDecoder = new TextDecoderStream();
     port.readable.pipeTo(textDecoder.writable);
     const reader = textDecoder.readable.getReader();
-    
+
     let buffer = '';
     const sessionStartTime = Date.now(); // Track session start for clean X-axis
+    calculatedVelocityRef.current = {
+      vx: 0,
+      vy: 0,
+      vz: 0,
+      ax: 0,
+      ay: 0,
+      az: 0,
+      timestamp: null
+    };
 
     try {
       while (true) {
@@ -397,33 +415,50 @@ function App() {
               continue;
             }
 
-            // Legacy telemetry format:
-            // "1,vx,vy,vz,ax,ay,az,roll,pitch,yaw,alt,pressure"
+            // Telemetry format:
+            // "$RTG,state,1,ax,ay,az,roll,pitch,yaw,alt,pressure"
             // "2,lat,lon,vbat,current,t1,t2"
             const parts = line.startsWith('$RTG,')
               ? line.split(',').slice(2)
               : line.split(',');
             const packetId = parseInt(parts[0]);
             
-            if (packetId === 1 && parts.length >= 10) {
+            if (packetId === 1 && parts.length >= (line.startsWith('$RTG,') ? 9 : 10)) {
               const elapsedSec = (Date.now() - sessionStartTime) / 1000;
+              const packetTimestamp = Date.now();
+              const acceleration = {
+                ax: parseFloat(parts[line.startsWith('$RTG,') ? 1 : 4]) || 0,
+                ay: parseFloat(parts[line.startsWith('$RTG,') ? 2 : 5]) || 0,
+                az: parseFloat(parts[line.startsWith('$RTG,') ? 3 : 6]) || 0
+              };
+              const previousVelocity = calculatedVelocityRef.current;
+              const deltaSec = previousVelocity.timestamp === null
+                ? 0
+                : Math.min((packetTimestamp - previousVelocity.timestamp) / 1000, 1);
+              const velocity = {
+                vx: previousVelocity.vx + ((previousVelocity.ax + acceleration.ax) / 2) * deltaSec,
+                vy: previousVelocity.vy + ((previousVelocity.ay + acceleration.ay) / 2) * deltaSec,
+                vz: previousVelocity.vz + ((previousVelocity.az + acceleration.az) / 2) * deltaSec
+              };
+              calculatedVelocityRef.current = {
+                ...velocity,
+                ...acceleration,
+                timestamp: packetTimestamp
+              };
+              const dataOffset = line.startsWith('$RTG,') ? 1 : 4;
               
               const newData = {
                 time: elapsedSec, // Clean seconds format instead of full Date.now() timestamp
-                vx: parseFloat(parts[1]) || 0,
-                vy: parseFloat(parts[2]) || 0,
-                vz: parseFloat(parts[3]) || 0,
-                v: Math.sqrt(Math.pow(parseFloat(parts[1])||0, 2) + Math.pow(parseFloat(parts[2])||0, 2) + Math.pow(parseFloat(parts[3])||0, 2)),
-                ax: parseFloat(parts[4]) || 0,
-                ay: parseFloat(parts[5]) || 0,
-                az: parseFloat(parts[6]) || 0,
-                a: Math.sqrt(Math.pow(parseFloat(parts[4])||0, 2) + Math.pow(parseFloat(parts[5])||0, 2) + Math.pow(parseFloat(parts[6])||0, 2)),
+                ...velocity,
+                v: Math.sqrt(velocity.vx ** 2 + velocity.vy ** 2 + velocity.vz ** 2),
+                ...acceleration,
+                a: Math.sqrt(acceleration.ax ** 2 + acceleration.ay ** 2 + acceleration.az ** 2),
                 // Assuming gyro is sent in degrees, converting to radians for 3D model
-                roll: (parseFloat(parts[7]) || 0) * (Math.PI / 180),
-                pitch: (parseFloat(parts[8]) || 0) * (Math.PI / 180),
-                yaw: (parseFloat(parts[9]) || 0) * (Math.PI / 180),
-                alt: parseFloat(parts[10]) || 0,
-                pressure: parseFloat(parts[11]) || 0
+                roll: (parseFloat(parts[dataOffset + 3]) || 0) * (Math.PI / 180),
+                pitch: (parseFloat(parts[dataOffset + 4]) || 0) * (Math.PI / 180),
+                yaw: (parseFloat(parts[dataOffset + 5]) || 0) * (Math.PI / 180),
+                alt: parseFloat(parts[dataOffset + 6]) || 0,
+                pressure: parseFloat(parts[dataOffset + 7]) || 0
               };
 
               setTelemetryData(prev => {
